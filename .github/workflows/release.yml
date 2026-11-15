@@ -44,8 +44,9 @@ jobs:
           Copy-Item README.md, LICENSE out/app; Copy-Item README.md, LICENSE out/cli
           Compress-Archive out/app/* "dist/Artiseal-$v-win-x64.zip"
           Compress-Archive out/cli/* "dist/artiseal-cli-$v-win-x64.zip"
-          Get-ChildItem dist/*.zip | ForEach-Object { "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } |
-            Set-Content dist/SHA256SUMS.txt -Encoding ascii
+          # LF line endings, as sha256sum -c expects on every platform.
+          $sums = Get-ChildItem dist/*.zip | ForEach-Object { "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)" }
+          [IO.File]::WriteAllText("$PWD/dist/SHA256SUMS.txt", ($sums -join "`n") + "`n")
 
       # The release can be checked with Artiseal itself. GitHub only stores attestations for public repos
       # on free plans, so this step runs once the repo is public.

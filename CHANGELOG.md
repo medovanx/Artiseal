@@ -4,6 +4,12 @@ All notable changes to Artiseal are written here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-15
+
+### Fixed
+
+- `SHA256SUMS.txt` now uses LF line endings, so `sha256sum -c SHA256SUMS.txt` works on every platform.
+
 ## [0.1.0] - 2026-11-15
 
 ### Added
@@ -20,5 +26,6 @@ All notable changes to Artiseal are written here. The format follows [Keep a Cha
 - Checks that the signed build record names the file's exact fingerprint, a step the Sigstore .NET library skips for DSSE bundles.
 - Matches repo names the way GitHub does (ignoring letter case) and never lets a dot or a prefix stand in for a real name.
 
-[Unreleased]: https://github.com/medovanx/Artiseal/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/medovanx/Artiseal/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/medovanx/Artiseal/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/medovanx/Artiseal/releases/tag/v0.1.0

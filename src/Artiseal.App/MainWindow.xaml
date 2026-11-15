@@ -1,76 +1,90 @@
 ﻿<Window x:Class="Artiseal.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Artiseal" Width="680" Icon="Assets/app.ico" SizeToContent="Height" MinHeight="300"
+        Title="Artiseal" Width="560" SizeToContent="Height" Icon="Assets/app.ico"
         ResizeMode="CanMinimize" WindowStartupLocation="CenterScreen"
         Background="{StaticResource Page}" FontFamily="Segoe UI" FontSize="13"
         Foreground="{StaticResource Ink}" AllowDrop="True" Drop="OnDrop">
 
-    <StackPanel Margin="24,20,24,20">
+    <StackPanel Margin="24,20,24,18">
 
-        <!-- The file -->
-        <Border Style="{StaticResource Card}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock x:Name="FileName" Text="No file chosen" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                    <TextBox x:Name="FileHash" Style="{StaticResource Quiet}" Text="Drop a file here, or choose one." Margin="0,4,0,0" />
-                </StackPanel>
-                <Button Grid.Column="1" Content="Choose file" Style="{StaticResource Secondary}" Click="OnChooseFile" VerticalAlignment="Center" Margin="12,0,0,0" />
-            </Grid>
-        </Border>
-
-        <!-- Who published it -->
-        <TextBlock Text="Who published it?" FontWeight="SemiBold" Margin="0,18,0,6" />
+        <!-- The file: name and size; the full fingerprint is in the tooltip. -->
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <ComboBox x:Name="RepoBox" IsEditable="True" Padding="8,6" FontSize="14"
-                      ToolTip="owner/repo, or paste the project's GitHub link"
-                      KeyDown="OnRepoKeyDown" />
-            <Button x:Name="CheckButton" Grid.Column="1" Content="Check" Style="{StaticResource Primary}" Click="OnCheck" Margin="10,0,0,0" IsEnabled="False" />
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock x:Name="FileName" Text="Drop a file here" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="FileDetails" Text="or choose one to verify" Foreground="{StaticResource Muted}" Margin="0,2,0,0" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="Choose file" Style="{StaticResource Secondary}" Click="OnChooseFile" VerticalAlignment="Center" Margin="12,0,0,0" />
         </Grid>
-        <TextBlock x:Name="RepoHint" Text="Type owner/repo, like cli/cli, or paste the project's GitHub link." Foreground="{StaticResource Muted}" Margin="0,6,0,0" TextWrapping="Wrap" />
 
         <!-- The answer -->
-        <Border x:Name="ResultCard" Style="{StaticResource Card}" Margin="0,18,0,0" Visibility="Collapsed">
+        <Border x:Name="ResultCard" Style="{StaticResource Card}" Margin="0,16,0,0" Visibility="Collapsed">
             <StackPanel>
                 <TextBlock x:Name="ResultRepo" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
-                <TextBlock x:Name="ResultVerdict" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap" />
-                <TextBlock x:Name="ResultMessage" Foreground="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <!-- A turning arc while Artiseal is working, so the window never looks stuck. -->
+                    <Path x:Name="Spinner" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Visibility="Collapsed"
+                          Stroke="{StaticResource Accent}" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Data="M 8,1.5 A 6.5,6.5 0 1 1 1.5,8" RenderTransformOrigin="0.5,0.5">
+                        <Path.RenderTransform>
+                            <RotateTransform x:Name="SpinnerTurn" />
+                        </Path.RenderTransform>
+                        <Path.Triggers>
+                            <EventTrigger RoutedEvent="Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="SpinnerTurn" Storyboard.TargetProperty="Angle"
+                                                         From="0" To="360" Duration="0:0:0.9" RepeatBehavior="Forever" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Path.Triggers>
+                    </Path>
+                    <TextBlock x:Name="ResultVerdict" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </StackPanel>
+                <TextBlock x:Name="ResultMessage" Foreground="{StaticResource Muted}" Margin="0,6,0,0" TextWrapping="Wrap" />
                 <TextBlock x:Name="ResultOthers" Foreground="{StaticResource Warn}" FontWeight="SemiBold" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
 
-                <Grid x:Name="FactsGrid" Margin="0,14,0,0" Visibility="Collapsed">
+                <Grid x:Name="FactsGrid" Margin="0,12,0,0" Visibility="Collapsed">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="110" />
+                        <ColumnDefinition Width="90" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition /><RowDefinition />
+                        <RowDefinition /><RowDefinition /><RowDefinition />
                     </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Text="Workflow" Style="{StaticResource Label}" />
-                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="FactWorkflow" Style="{StaticResource Value}" />
-                    <TextBlock Grid.Row="1" Text="Branch or tag" Style="{StaticResource Label}" />
-                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="FactRef" Style="{StaticResource Value}" />
-                    <TextBlock Grid.Row="2" Text="Commit" Style="{StaticResource Label}" />
-                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource Value}"><Hyperlink x:Name="FactCommitLink" RequestNavigate="OnLink"><Run x:Name="FactCommit" /></Hyperlink></TextBlock>
-                    <TextBlock Grid.Row="3" Text="Started by" Style="{StaticResource Label}" />
-                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="FactTrigger" Style="{StaticResource Value}" />
-                    <TextBlock Grid.Row="4" Text="Signed" Style="{StaticResource Label}" />
-                    <TextBlock Grid.Row="4" Grid.Column="1" x:Name="FactSigned" Style="{StaticResource Value}" />
-                    <TextBlock Grid.Row="5" Text="Build run" Style="{StaticResource Label}" />
-                    <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource Value}"><Hyperlink x:Name="FactRunLink" RequestNavigate="OnLink"><Run Text="Open the run on GitHub" /></Hyperlink></TextBlock>
+                    <TextBlock Grid.Row="0" Text="Built from" Style="{StaticResource Label}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource Value}"><Hyperlink x:Name="FactCommitLink" RequestNavigate="OnLink"><Run x:Name="FactCommit" /></Hyperlink><Run x:Name="FactRef" Foreground="{StaticResource Muted}" /></TextBlock>
+                    <TextBlock Grid.Row="1" Text="Signed" Style="{StaticResource Label}" />
+                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="FactSigned" Style="{StaticResource Value}" />
+                    <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource Value}"><Hyperlink x:Name="FactRunLink" RequestNavigate="OnLink" ToolTip="The GitHub Actions run that built and signed this file"><Run Text="Open the build run" /></Hyperlink></TextBlock>
                 </Grid>
             </StackPanel>
         </Border>
 
-        <!-- Footer -->
-        <CheckBox x:Name="MenuToggle" Content="Show &quot;Verify with Artiseal&quot; when I right-click a file" Margin="0,18,0,0"
-                  Foreground="{StaticResource Muted}" Click="OnMenuToggle" />
+        <!-- Another repo: hidden until asked for, or until nothing was found. -->
+        <TextBlock x:Name="OtherRepoLink" Margin="0,12,0,0" Visibility="Collapsed">
+            <Hyperlink Click="OnShowRepoInput"><Run Text="Check a different repo" /></Hyperlink>
+        </TextBlock>
+        <StackPanel x:Name="RepoPanel" Margin="0,14,0,0" Visibility="Collapsed">
+            <TextBlock x:Name="RepoHint" Text="Which project published it? Type owner/repo or paste its GitHub link." Foreground="{StaticResource Muted}" Margin="0,0,0,6" TextWrapping="Wrap" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox x:Name="RepoBox" IsEditable="True" Padding="8,6" FontSize="14" KeyDown="OnRepoKeyDown" />
+                <Button x:Name="CheckButton" Grid.Column="1" Content="Check" Style="{StaticResource Primary}" Click="OnCheck" Margin="10,0,0,0" IsEnabled="False" />
+            </Grid>
+        </StackPanel>
+
+        <!-- Footer: one quiet link. -->
+        <TextBlock Margin="0,18,0,0" HorizontalAlignment="Right" Foreground="{StaticResource Muted}">
+            <Hyperlink x:Name="MenuLink" Click="OnMenuToggle" Foreground="{StaticResource Muted}"><Run x:Name="MenuLinkText" Text="Add to right-click menu" /></Hyperlink>
+        </TextBlock>
     </StackPanel>
 </Window>

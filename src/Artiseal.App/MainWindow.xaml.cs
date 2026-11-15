@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
@@ -18,9 +18,13 @@ public partial class MainWindow : Window
     // One verifier for the app's life: it fetches Sigstore's trust root once.
     private static readonly SigstoreVerifier Verifier = Trust.NewVerifier();
 
+    // A repo found in the log is only a lead; each one gets the full check, and every verified one is shown.
+    private const int MaxCandidates = 5;
+
     private readonly RecentRepos _recent = RecentRepos.Default();
     private string? _path;
     private string? _hash;
+    private bool _busy;
 
     public MainWindow(string? path)
     {
@@ -29,7 +33,7 @@ public partial class MainWindow : Window
         RepoBox.ItemsSource = _recent.Load();
         RepoBox.AddHandler(System.Windows.Controls.Primitives.TextBoxBase.TextChangedEvent,
             new System.Windows.Controls.TextChangedEventHandler((_, _) => UpdateCheckButton()));
-        MenuToggle.IsChecked = ExplorerMenu.IsInstalled();
+        UpdateMenuLink();
 
         if (path is not null && File.Exists(path))
         {
@@ -41,34 +45,26 @@ public partial class MainWindow : Window
     {
         _path = path;
         _hash = null;
-        ResultCard.Visibility = Visibility.Collapsed;
         FileName.Text = Path.GetFileName(path);
-        FileHash.Text = "Working out the file's fingerprint...";
+        FileDetails.Text = FormatSize(new FileInfo(path).Length);
+        FileName.ToolTip = null;
         RepoBox.Text = string.Empty;
-        UpdateCheckButton();
+        RepoPanel.Visibility = Visibility.Collapsed;
+        OtherRepoLink.Visibility = Visibility.Collapsed;
+        ShowVerdict(Path.GetFileName(path), "Reading the file...", "Working out its fingerprint.", "Muted");
 
         _hash = await ProofChecker.HashAsync(path);
-        FileHash.Text = "SHA-256 " + _hash;
+        FileName.ToolTip = "SHA-256 " + _hash;
 
         // Where it was downloaded from wins; otherwise ask the public log who signed this hash.
         RepoName? guess = DownloadSource.GuessRepo(path);
 
-        if (guess is not null)
+        if (guess is not null && await CheckAsync([guess]))
         {
-            RepoBox.Text = guess.ToString();
-            RepoHint.Text = "Filled in from where you downloaded the file. Change it if that's wrong.";
-
-            if (await CheckAsync([guess]))
-            {
-                return;
-            }
-            // The download page's repo didn't build it; the public log may know who did.
+            return;
         }
 
-        if (guess is null)
-        {
-            ShowVerdict("Looking it up", "Finding who published this file...", "Searching Sigstore's public log for this file's fingerprint.", "Muted");
-        }
+        ShowVerdict(guess?.ToString() ?? "Looking it up", "Finding who published this file...", "Searching Sigstore's public log.", "Muted");
         IReadOnlyList<RepoName> found = [];
 
         try
@@ -82,40 +78,22 @@ public partial class MainWindow : Window
 
         if (found.Count == 0 && guess is not null)
         {
-            // The download page's answer stays on screen; nobody else signed this file either.
+            // Nobody else signed it either: show the download page's answer again.
+            await CheckAsync([guess]);
+
             return;
         }
         if (found.Count == 0)
         {
-            ResultCard.Visibility = Visibility.Collapsed;
-            RepoHint.Text = "No public build record names this file. If you know the project, type owner/repo, like cli/cli.";
-            UpdateCheckButton();
-            RepoBox.Focus();
+            ShowVerdict("Publisher unknown", "No public build record", "Nothing ties this file to a GitHub repo. If you know the project, check it below.", "Warn");
+            ShowRepoInput("Which project published it? Type owner/repo or paste its GitHub link.");
 
             return;
         }
 
         RepoBox.ItemsSource = found.Select(r => r.ToString()).Concat(_recent.Load()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        RepoBox.Text = found[0].ToString();
-        RepoHint.Text = found.Count == 1
-            ? "Found in Sigstore's public log. You can type another repo to check against it instead."
-            : $"{found.Count} repos have signed this file. Each one is checked below.";
         await CheckAsync(found);
     }
-
-    private void UpdateCheckButton() =>
-        CheckButton.IsEnabled = _hash is not null && RepoName.TryParse(RepoBox.Text, out _);
-
-    private async void OnCheck(object sender, RoutedEventArgs e)
-    {
-        if (_path is not null && RepoName.TryParse(RepoBox.Text, out RepoName repo))
-        {
-            await CheckAsync([repo]);
-        }
-    }
-
-    // A repo found in the log is only a lead; each one gets the full check, and every verified one is shown.
-    private const int MaxCandidates = 5;
 
     /// <summary>Checks each repo and shows the result; true when at least one verified.</summary>
     private async Task<bool> CheckAsync(IReadOnlyList<RepoName> repos)
@@ -124,8 +102,7 @@ public partial class MainWindow : Window
         {
             return false;
         }
-        CheckButton.IsEnabled = false;
-        ShowVerdict(repos[0].ToString(), "Checking...", "Asking GitHub for this file's build proof and checking its signature.", "Muted");
+        ShowVerdict(repos[0].ToString(), "Checking...", "Fetching the build proof and checking its signature.", "Muted");
 
         try
         {
@@ -144,15 +121,15 @@ public partial class MainWindow : Window
             if (verified.Count > 1)
             {
                 ResultOthers.Text = "Also signed by " + string.Join(", ", verified.Skip(1).Select(r => r.Repo)) +
-                    ". The same file was built in more than one repo, so make sure you trust the one you meant to download from.";
+                    ". Make sure you meant to download from " + lead.Repo + ".";
                 ResultOthers.Visibility = Visibility.Visible;
             }
 
             if (lead.Verdict is Verdict.Verified or Verdict.NoProof or Verdict.Failed)
             {
                 _recent.Remember(lead.Repo);
-                RepoBox.Text = lead.Repo.ToString();
             }
+            OtherRepoLink.Visibility = RepoPanel.IsVisible ? Visibility.Collapsed : Visibility.Visible;
 
             return verified.Count > 0;
         }
@@ -162,18 +139,14 @@ public partial class MainWindow : Window
 
             return false;
         }
-        finally
-        {
-            UpdateCheckButton();
-        }
     }
 
     private void ShowReport(ProofReport report)
     {
         (string verdict, string tone) = report.Verdict switch
         {
-            Verdict.Verified => ("Verified: built from this repo's code", "Good"),
-            Verdict.NoProof => ("No build proof for this file", "Warn"),
+            Verdict.Verified => ("Verified", "Good"),
+            Verdict.NoProof => ("No build proof", "Warn"),
             Verdict.Failed => ("Proof doesn't check out", "Bad"),
             _ => ("Couldn't check", "Warn"),
         };
@@ -183,11 +156,9 @@ public partial class MainWindow : Window
 
         if (report.Facts is { } f)
         {
-            FactWorkflow.Text = f.Workflow ?? "Unknown";
-            FactRef.Text = ShortRef(f.GitRef);
-            FactCommit.Text = f.Commit is { Length: >= 7 } c ? c[..7] : f.Commit ?? "Unknown";
+            FactCommit.Text = f.Commit is { Length: >= 7 } c ? "commit " + c[..7] : "unknown commit";
             FactCommitLink.NavigateUri = f.Commit is null ? null : new Uri($"{f.Repository}/commit/{f.Commit}");
-            FactTrigger.Text = f.Trigger ?? "Unknown";
+            FactRef.Text = ShortRef(f.GitRef);
             FactSigned.Text = f.SignedAt?.ToLocalTime().ToString("d MMMM yyyy, HH:mm") ?? "Unknown";
             FactRunLink.NavigateUri = f.RunUrl is null ? null : new Uri(f.RunUrl);
             FactsGrid.Visibility = Visibility.Visible;
@@ -196,8 +167,8 @@ public partial class MainWindow : Window
 
     private static string ExplainFor(ProofReport report) => report.Verdict switch
     {
-        Verdict.Verified => $"This exact file was built by GitHub Actions in {report.Repo}, and nothing has changed it since. Only trust it as much as you trust {report.Repo}.",
-        Verdict.NoProof => $"{report.Message} The file may be fine, but nothing proves where it came from. Many projects don't publish build proofs yet.",
+        Verdict.Verified => $"Built by GitHub Actions in {report.Repo} and unchanged since.",
+        Verdict.NoProof => $"{report.Repo} published no build proof for this file.",
         _ => report.Message,
     };
 
@@ -205,19 +176,61 @@ public partial class MainWindow : Window
     {
         ResultRepo.Text = repo;
         ResultVerdict.Text = verdict;
-        ResultVerdict.Foreground = (Brush)FindResource(tone == "Muted" ? "Muted" : tone);
+        ResultVerdict.Foreground = (Brush)FindResource(tone);
         ResultMessage.Text = message;
         ResultOthers.Visibility = Visibility.Collapsed;
         FactsGrid.Visibility = Visibility.Collapsed;
         ResultCard.Visibility = Visibility.Visible;
+
+        // "Muted" is only ever a step in progress: spin, and keep Check from starting a second run.
+        _busy = tone == "Muted";
+        Spinner.Visibility = _busy ? Visibility.Visible : Visibility.Collapsed;
+        CheckButton.Content = _busy ? "Checking..." : "Check";
+
+        if (_busy)
+        {
+            OtherRepoLink.Visibility = Visibility.Collapsed;
+        }
+        UpdateCheckButton();
     }
+
+    private void ShowRepoInput(string hint)
+    {
+        RepoHint.Text = hint;
+        RepoPanel.Visibility = Visibility.Visible;
+        OtherRepoLink.Visibility = Visibility.Collapsed;
+        RepoBox.Focus();
+    }
+
+    private void UpdateCheckButton() =>
+        CheckButton.IsEnabled = !_busy && _hash is not null && RepoName.TryParse(RepoBox.Text, out _);
+
+    private async void OnCheck(object sender, RoutedEventArgs e)
+    {
+        if (_path is not null && RepoName.TryParse(RepoBox.Text, out RepoName repo))
+        {
+            await CheckAsync([repo]);
+        }
+    }
+
+    private void OnShowRepoInput(object sender, RoutedEventArgs e) =>
+        ShowRepoInput("Check this file against another repo. Type owner/repo or paste its GitHub link.");
 
     private static string ShortRef(string? gitRef) => gitRef switch
     {
-        null => "Unknown",
-        _ when gitRef.StartsWith("refs/tags/", StringComparison.Ordinal) => "tag " + gitRef["refs/tags/".Length..],
-        _ when gitRef.StartsWith("refs/heads/", StringComparison.Ordinal) => "branch " + gitRef["refs/heads/".Length..],
-        _ => gitRef,
+        null => string.Empty,
+        _ when gitRef.StartsWith("refs/tags/", StringComparison.Ordinal) => ", tag " + gitRef["refs/tags/".Length..],
+        _ when gitRef.StartsWith("refs/heads/", StringComparison.Ordinal) => ", branch " + gitRef["refs/heads/".Length..],
+        _ => ", " + gitRef,
+    };
+
+    // Rounds down to one decimal, the way Explorer shows sizes, so both agree.
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1L << 30 => $"{Math.Floor(bytes * 10.0 / (1L << 30)) / 10:0.0} GB",
+        >= 1L << 20 => $"{Math.Floor(bytes * 10.0 / (1L << 20)) / 10:0.0} MB",
+        >= 1L << 10 => $"{Math.Floor(bytes / 1024.0):0} KB",
+        _ => $"{bytes} bytes",
     };
 
     private void OnChooseFile(object sender, RoutedEventArgs e)
@@ -258,8 +271,11 @@ public partial class MainWindow : Window
 
     private void OnMenuToggle(object sender, RoutedEventArgs e)
     {
-        // Windows asks for admin rights here; if that's refused, the box goes back to what's really installed.
-        ExplorerMenu.Set(MenuToggle.IsChecked == true);
-        MenuToggle.IsChecked = ExplorerMenu.IsInstalled();
+        // Windows asks for admin rights here; the link then shows what is really installed.
+        ExplorerMenu.Set(!ExplorerMenu.IsInstalled());
+        UpdateMenuLink();
     }
+
+    private void UpdateMenuLink() =>
+        MenuLinkText.Text = ExplorerMenu.IsInstalled() ? "Remove from right-click menu" : "Add to right-click menu";
 }

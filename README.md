@@ -35,6 +35,10 @@ Artiseal answers in one click. It finds who published the file, checks GitHub's 
 
 ## Screenshots
 
+<p align="center">
+  <img src="docs/screenshots/right-click.png" alt="Verify with Artiseal on the right-click menu" width="520" />
+</p>
+
 | A file nobody vouches for | A file checked against a repo that never built it |
 | --- | --- |
 | <img src="docs/screenshots/no-record.png" alt="No public build record" width="400" /> | <img src="docs/screenshots/no-proof.png" alt="No build proof from that repo" width="400" /> |

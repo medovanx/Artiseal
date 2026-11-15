@@ -70,7 +70,7 @@
         </Border>
 
         <!-- Footer -->
-        <CheckBox x:Name="MenuToggle" Content="Show &quot;Check with Artiseal&quot; when I right-click a file" Margin="0,18,0,0"
+        <CheckBox x:Name="MenuToggle" Content="Show &quot;Verify with Artiseal&quot; when I right-click a file" Margin="0,18,0,0"
                   Foreground="{StaticResource Muted}" Click="OnMenuToggle" />
     </StackPanel>
 </Window>

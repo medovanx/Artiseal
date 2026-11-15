@@ -258,13 +258,8 @@ public partial class MainWindow : Window
 
     private void OnMenuToggle(object sender, RoutedEventArgs e)
     {
-        if (MenuToggle.IsChecked == true)
-        {
-            ExplorerMenu.Install();
-        }
-        else
-        {
-            ExplorerMenu.Uninstall();
-        }
+        // Windows asks for admin rights here; if that's refused, the box goes back to what's really installed.
+        ExplorerMenu.Set(MenuToggle.IsChecked == true);
+        MenuToggle.IsChecked = ExplorerMenu.IsInstalled();
     }
 }

@@ -30,7 +30,7 @@ Artiseal answers in one click. It finds who published the file, checks GitHub's 
 - **Shows its work.** Workflow file, branch or tag, commit, when it was signed, and a link to the build run on GitHub.
 - **Honest about what it can't prove.** If a project publishes no build records, Artiseal says so instead of guessing.
 - **Warns about look-alikes.** If more than one repo has signed the same file, you see all of them.
-- **Right-click menu.** "Check with Artiseal" on every file in Explorer, with no admin rights needed.
+- **Right-click menu.** "Verify with Artiseal", with the app icon, on every file in Explorer. Turning it on asks for admin rights once.
 - **Free and private.** No account, no server of ours, no tracking. It talks only to GitHub and Sigstore.
 
 ## Screenshots
@@ -42,8 +42,8 @@ Artiseal answers in one click. It finds who published the file, checks GitHub's 
 ## Quick start
 
 1. Download `Artiseal-<version>-win-x64.zip` from the [latest release](https://github.com/medovanx/Artiseal/releases/latest) and unzip it anywhere. It is a single `Artiseal.exe` with nothing to install and no .NET needed.
-2. Open Artiseal and tick **Show "Check with Artiseal" when I right-click a file**.
-3. Right-click any downloaded file and choose **Check with Artiseal**. On Windows 11 it sits under **Show more options**.
+2. Open Artiseal and tick **Show "Verify with Artiseal" when I right-click a file**.
+3. Right-click any downloaded file and choose **Verify with Artiseal**.
 
 You can also drop a file on the window, or use **Choose file**.
 

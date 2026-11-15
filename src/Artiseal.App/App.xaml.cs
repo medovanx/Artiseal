@@ -9,17 +9,20 @@ public partial class App : Application
         base.OnStartup(e);
 
         // Installer switches: add or remove the right-click entry without opening the window.
-        if (e.Args is ["--install-menu"])
+        // They ask for admin rights themselves when needed; exit code 1 means it wasn't changed.
+        if (e.Args is ["--install-menu"] or ["--remove-menu"])
         {
-            ExplorerMenu.Install();
-            Shutdown();
+            bool done;
 
-            return;
-        }
-        if (e.Args is ["--remove-menu"])
-        {
-            ExplorerMenu.Uninstall();
-            Shutdown();
+            try
+            {
+                done = ExplorerMenu.Set(e.Args[0] == "--install-menu");
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                done = false;
+            }
+            Shutdown(done ? 0 : 1);
 
             return;
         }

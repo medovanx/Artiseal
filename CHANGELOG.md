@@ -4,6 +4,17 @@ All notable changes to Artiseal are written here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-15
+
+### Changed
+
+- The right-click entry is now called "Verify with Artiseal" and shows the app icon.
+- The entry is installed for all users, so turning it on asks for admin rights once.
+
+### Fixed
+
+- The right-click entry did not appear on Windows 11 builds that ignore per-user menu entries (26300 and later). An entry left by 0.1.x is removed.
+
 ## [0.1.1] - 2026-11-15
 
 ### Fixed
@@ -26,6 +37,7 @@ All notable changes to Artiseal are written here. The format follows [Keep a Cha
 - Checks that the signed build record names the file's exact fingerprint, a step the Sigstore .NET library skips for DSSE bundles.
 - Matches repo names the way GitHub does (ignoring letter case) and never lets a dot or a prefix stand in for a real name.
 
-[Unreleased]: https://github.com/medovanx/Artiseal/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/medovanx/Artiseal/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/medovanx/Artiseal/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/medovanx/Artiseal/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/medovanx/Artiseal/releases/tag/v0.1.0

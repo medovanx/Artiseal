@@ -1,7 +1,7 @@
 <Project>
   <!-- One version for every project. Release builds take it from the git tag (vX.Y.Z), see .github/workflows/release.yml. -->
   <PropertyGroup>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
     <Authors>Mohamed Darwesh</Authors>
     <Product>Artiseal</Product>
     <Copyright>Copyright (c) 2026 Mohamed Darwesh</Copyright>

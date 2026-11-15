@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Artiseal.Cli/Artiseal.Cli.csproj" />
+    <Project Path="src/Artiseal.Core/Artiseal.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Artiseal.Tests/Artiseal.Tests.csproj" />
+  </Folder>
+</Solution>

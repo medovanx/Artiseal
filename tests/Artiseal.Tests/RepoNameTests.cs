@@ -45,3 +45,28 @@ public class BundleTextTests
         Assert.Equal("{\"mediaType\":\"x\"}", BundleText.Decode(packed));
     }
 }
+
+public class DownloadSourceTests
+{
+    [Fact]
+    public void Release_page_referrer_wins_over_cdn_host()
+    {
+        const string zone = "[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=https://github.com/cli/cli/releases/tag/v2.104.0\r\nHostUrl=https://release-assets.githubusercontent.com/github-production-release-asset/212613049/x\r\n";
+
+        Assert.Equal(new RepoName("cli", "cli"), DownloadSource.GuessFromZoneText(zone));
+    }
+
+    [Fact]
+    public void Direct_download_link_names_the_repo()
+    {
+        const string zone = "[ZoneTransfer]\nZoneId=3\nHostUrl=https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_windows_amd64.zip\n";
+
+        Assert.Equal(new RepoName("cli", "cli"), DownloadSource.GuessFromZoneText(zone));
+    }
+
+    [Fact]
+    public void Non_github_source_gives_no_guess()
+    {
+        Assert.Null(DownloadSource.GuessFromZoneText("[ZoneTransfer]\nZoneId=3\nHostUrl=https://example.com/tool.zip\n"));
+    }
+}

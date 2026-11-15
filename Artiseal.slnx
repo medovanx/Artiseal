@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Artiseal.App/Artiseal.App.csproj" />
     <Project Path="src/Artiseal.Cli/Artiseal.Cli.csproj" />
     <Project Path="src/Artiseal.Core/Artiseal.Core.csproj" />
   </Folder>

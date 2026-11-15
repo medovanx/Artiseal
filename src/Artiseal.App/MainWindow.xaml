@@ -43,6 +43,7 @@
                 <TextBlock x:Name="ResultRepo" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
                 <TextBlock x:Name="ResultVerdict" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap" />
                 <TextBlock x:Name="ResultMessage" Foreground="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                <TextBlock x:Name="ResultOthers" Foreground="{StaticResource Warn}" FontWeight="SemiBold" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
 
                 <Grid x:Name="FactsGrid" Margin="0,14,0,0" Visibility="Collapsed">
                     <Grid.ColumnDefinitions>

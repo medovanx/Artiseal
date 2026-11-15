@@ -72,9 +72,18 @@ public sealed class AttestationClient(HttpClient http, string? token = null)
     private async Task<string> FetchBundleAsync(string url, CancellationToken ct)
     {
         // A signed storage link: sending GitHub's token there would leak it to another host.
-        byte[] body = await http.GetByteArrayAsync(url, ct);
-
-        return BundleText.Decode(body);
+        // One retry covers a passing DNS or connection blip; a second failure goes to the caller.
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return BundleText.Decode(await http.GetByteArrayAsync(url, ct));
+            }
+            catch (HttpRequestException) when (attempt == 1)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), ct);
+            }
+        }
     }
 
     private async Task<bool> RepoExistsAsync(RepoName repo, CancellationToken ct)

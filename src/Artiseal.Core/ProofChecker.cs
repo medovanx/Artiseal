@@ -115,7 +115,7 @@ public sealed class ProofChecker(AttestationClient client, SigstoreVerifier veri
     private const string SlsaProvenance = "https://slsa.dev/provenance/";
 
     /// <summary>Null when the signed statement is build provenance naming this exact sha256.</summary>
-    internal static string? SubjectProblem(InTotoStatement? statement, string sha256Hex)
+    public static string? SubjectProblem(InTotoStatement? statement, string sha256Hex)
     {
         if (statement is null)
         {

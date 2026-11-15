@@ -42,23 +42,51 @@ public partial class MainWindow : Window
         _hash = null;
         ResultCard.Visibility = Visibility.Collapsed;
         FileName.Text = Path.GetFileName(path);
-        FileHash.Text = "Working out the file's fingerprint…";
+        FileHash.Text = "Working out the file's fingerprint...";
+        RepoBox.Text = string.Empty;
         UpdateCheckButton();
 
         _hash = await ProofChecker.HashAsync(path);
         FileHash.Text = "SHA-256 " + _hash;
 
+        // Where it was downloaded from wins; otherwise ask the public log who signed this hash.
         if (DownloadSource.GuessRepo(path) is { } guess)
         {
             RepoBox.Text = guess.ToString();
             RepoHint.Text = "Filled in from where you downloaded the file. Change it if that's wrong.";
+            await CheckAsync([guess]);
+
+            return;
         }
-        else
+
+        ShowVerdict("Looking it up", "Finding who published this file...", "Searching Sigstore's public log for this file's fingerprint.", "Muted");
+        IReadOnlyList<RepoName> found = [];
+
+        try
         {
-            RepoHint.Text = "Type owner/repo, like cli/cli, or paste the project's GitHub link.";
+            found = await new PublisherFinder(Http).FindAsync(_hash);
         }
-        UpdateCheckButton();
-        RepoBox.Focus();
+        catch (HttpRequestException)
+        {
+            // Falls through to asking the person.
+        }
+
+        if (found.Count == 0)
+        {
+            ResultCard.Visibility = Visibility.Collapsed;
+            RepoHint.Text = "No public build record names this file. If you know the project, type owner/repo, like cli/cli.";
+            UpdateCheckButton();
+            RepoBox.Focus();
+
+            return;
+        }
+
+        RepoBox.ItemsSource = found.Select(r => r.ToString()).Concat(_recent.Load()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        RepoBox.Text = found[0].ToString();
+        RepoHint.Text = found.Count == 1
+            ? "Found in Sigstore's public log. You can type another repo to check against it instead."
+            : $"{found.Count} repos have signed this file. Each one is checked below.";
+        await CheckAsync(found);
     }
 
     private void UpdateCheckButton() =>
@@ -66,40 +94,59 @@ public partial class MainWindow : Window
 
     private async void OnCheck(object sender, RoutedEventArgs e)
     {
-        if (_path is null || !RepoName.TryParse(RepoBox.Text, out RepoName repo))
+        if (_path is not null && RepoName.TryParse(RepoBox.Text, out RepoName repo))
+        {
+            await CheckAsync([repo]);
+        }
+    }
+
+    // A repo found in the log is only a lead; each one gets the full check, and every verified one is shown.
+    private const int MaxCandidates = 5;
+
+    private async Task CheckAsync(IReadOnlyList<RepoName> repos)
+    {
+        if (_path is null)
         {
             return;
         }
         CheckButton.IsEnabled = false;
-        ShowWorking(repo);
+        ShowVerdict(repos[0].ToString(), "Checking...", "Asking GitHub for this file's build proof and checking its signature.", "Muted");
 
         try
         {
             ProofChecker checker = new(new AttestationClient(Http, Environment.GetEnvironmentVariable("GITHUB_TOKEN")), Verifier);
-            ProofReport report = await checker.CheckAsync(_path, repo);
+            List<ProofReport> reports = [];
 
-            ShowReport(report);
-
-            if (report.Verdict is Verdict.Verified or Verdict.NoProof or Verdict.Failed)
+            foreach (RepoName repo in repos.Take(MaxCandidates))
             {
-                _recent.Remember(repo);
-                RepoBox.ItemsSource = _recent.Load();
-                RepoBox.Text = repo.ToString();
+                reports.Add(await checker.CheckAsync(_path, repo));
+            }
+
+            List<ProofReport> verified = [.. reports.Where(r => r.Verdict == Verdict.Verified)];
+            ProofReport lead = verified.FirstOrDefault() ?? reports[0];
+            ShowReport(lead);
+
+            if (verified.Count > 1)
+            {
+                ResultOthers.Text = "Also signed by " + string.Join(", ", verified.Skip(1).Select(r => r.Repo)) +
+                    ". The same file was built in more than one repo, so make sure you trust the one you meant to download from.";
+                ResultOthers.Visibility = Visibility.Visible;
+            }
+
+            if (lead.Verdict is Verdict.Verified or Verdict.NoProof or Verdict.Failed)
+            {
+                _recent.Remember(lead.Repo);
+                RepoBox.Text = lead.Repo.ToString();
             }
         }
         catch (HttpRequestException)
         {
-            ShowVerdict(repo.ToString(), "Couldn't reach GitHub", "Check your internet connection and try again.", "Warn");
+            ShowVerdict(repos[0].ToString(), "Couldn't reach GitHub", "Check your internet connection and try again.", "Warn");
         }
         finally
         {
             UpdateCheckButton();
         }
-    }
-
-    private void ShowWorking(RepoName repo)
-    {
-        ShowVerdict(repo.ToString(), "Checking…", "Asking GitHub for this file's build proof and checking its signature.", "Muted");
     }
 
     private void ShowReport(ProofReport report)
@@ -141,6 +188,7 @@ public partial class MainWindow : Window
         ResultVerdict.Text = verdict;
         ResultVerdict.Foreground = (Brush)FindResource(tone == "Muted" ? "Muted" : tone);
         ResultMessage.Text = message;
+        ResultOthers.Visibility = Visibility.Collapsed;
         FactsGrid.Visibility = Visibility.Collapsed;
         ResultCard.Visibility = Visibility.Visible;
     }

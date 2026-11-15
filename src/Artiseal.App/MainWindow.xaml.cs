@@ -16,7 +16,7 @@ public partial class MainWindow : Window
     private static readonly HttpClient Http = new();
 
     // One verifier for the app's life: it fetches Sigstore's trust root once.
-    private static readonly SigstoreVerifier Verifier = new();
+    private static readonly SigstoreVerifier Verifier = Trust.NewVerifier();
 
     private readonly RecentRepos _recent = RecentRepos.Default();
     private string? _path;
@@ -25,6 +25,7 @@ public partial class MainWindow : Window
     public MainWindow(string? path)
     {
         InitializeComponent();
+        _ = Trust.WarmAsync();
         RepoBox.ItemsSource = _recent.Load();
         RepoBox.AddHandler(System.Windows.Controls.Primitives.TextBoxBase.TextChangedEvent,
             new System.Windows.Controls.TextChangedEventHandler((_, _) => UpdateCheckButton()));
@@ -50,16 +51,24 @@ public partial class MainWindow : Window
         FileHash.Text = "SHA-256 " + _hash;
 
         // Where it was downloaded from wins; otherwise ask the public log who signed this hash.
-        if (DownloadSource.GuessRepo(path) is { } guess)
+        RepoName? guess = DownloadSource.GuessRepo(path);
+
+        if (guess is not null)
         {
             RepoBox.Text = guess.ToString();
             RepoHint.Text = "Filled in from where you downloaded the file. Change it if that's wrong.";
-            await CheckAsync([guess]);
 
-            return;
+            if (await CheckAsync([guess]))
+            {
+                return;
+            }
+            // The download page's repo didn't build it; the public log may know who did.
         }
 
-        ShowVerdict("Looking it up", "Finding who published this file...", "Searching Sigstore's public log for this file's fingerprint.", "Muted");
+        if (guess is null)
+        {
+            ShowVerdict("Looking it up", "Finding who published this file...", "Searching Sigstore's public log for this file's fingerprint.", "Muted");
+        }
         IReadOnlyList<RepoName> found = [];
 
         try
@@ -71,6 +80,11 @@ public partial class MainWindow : Window
             // Falls through to asking the person.
         }
 
+        if (found.Count == 0 && guess is not null)
+        {
+            // The download page's answer stays on screen; nobody else signed this file either.
+            return;
+        }
         if (found.Count == 0)
         {
             ResultCard.Visibility = Visibility.Collapsed;
@@ -103,11 +117,12 @@ public partial class MainWindow : Window
     // A repo found in the log is only a lead; each one gets the full check, and every verified one is shown.
     private const int MaxCandidates = 5;
 
-    private async Task CheckAsync(IReadOnlyList<RepoName> repos)
+    /// <summary>Checks each repo and shows the result; true when at least one verified.</summary>
+    private async Task<bool> CheckAsync(IReadOnlyList<RepoName> repos)
     {
         if (_path is null)
         {
-            return;
+            return false;
         }
         CheckButton.IsEnabled = false;
         ShowVerdict(repos[0].ToString(), "Checking...", "Asking GitHub for this file's build proof and checking its signature.", "Muted");
@@ -138,10 +153,14 @@ public partial class MainWindow : Window
                 _recent.Remember(lead.Repo);
                 RepoBox.Text = lead.Repo.ToString();
             }
+
+            return verified.Count > 0;
         }
         catch (HttpRequestException)
         {
             ShowVerdict(repos[0].ToString(), "Couldn't reach GitHub", "Check your internet connection and try again.", "Warn");
+
+            return false;
         }
         finally
         {

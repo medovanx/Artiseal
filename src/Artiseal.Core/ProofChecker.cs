@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Sigstore;
 
 namespace Artiseal.Core;
@@ -93,9 +94,15 @@ public sealed class ProofChecker(AttestationClient client, SigstoreVerifier veri
     public async Task<(bool Success, VerificationResult? Result)> VerifyAsync(
         byte[] sha256, SigstoreBundle bundle, RepoName repo, CancellationToken ct = default)
     {
+        // The library's own GitHub helper matches names case-sensitively and unescaped ("cl." would match "cli"),
+        // so the identity is anchored and escaped here, and the source repo is compared below.
         VerificationPolicy policy = new()
         {
-            CertificateIdentity = CertificateIdentity.ForGitHubActions(repo.Owner, repo.Name),
+            CertificateIdentity = new CertificateIdentity
+            {
+                Issuer = ActionsIssuer,
+                SubjectAlternativeNamePattern = $"(?i)^https://github\\.com/{Regex.Escape(repo.Owner)}/{Regex.Escape(repo.Name)}/",
+            },
         };
 
         (bool ok, VerificationResult? result) = await verifier.TryVerifyDigestAsync(sha256, HashAlgorithmType.Sha256, bundle, policy, ct);
@@ -107,9 +114,21 @@ public sealed class ProofChecker(AttestationClient client, SigstoreVerifier veri
 
         // Sigstore 1.1.1 checks a DSSE envelope's signature but never compares its subjects with the artifact,
         // so the file-to-proof binding is enforced here, on the statement the signature covered.
-        string? problem = SubjectProblem(result.Statement, Convert.ToHexStringLower(sha256));
+        string? problem = RepoProblem(result.SignerIdentity, repo) ?? SubjectProblem(result.Statement, Convert.ToHexStringLower(sha256));
 
         return problem is null ? (true, result) : (false, result with { FailureReason = problem });
+    }
+
+    private const string ActionsIssuer = "https://token.actions.githubusercontent.com";
+
+    /// <summary>Null when the verified certificate says the build ran in exactly this repo (GitHub names ignore case).</summary>
+    public static string? RepoProblem(VerifiedIdentity? signer, RepoName repo)
+    {
+        string? source = signer?.Extensions?.SourceRepositoryUri;
+
+        return string.Equals(source, $"https://github.com/{repo.Owner}/{repo.Name}", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : $"The proof was built in {source ?? "an unnamed repo"}, not {repo}.";
     }
 
     private const string SlsaProvenance = "https://slsa.dev/provenance/";

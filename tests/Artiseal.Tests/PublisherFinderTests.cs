@@ -24,7 +24,9 @@ public class PublisherFinderTests
         Assert.Empty(PublisherFinder.ReposInEntryBody(Convert.ToBase64String("{\"kind\":\"dsse\"}"u8)));
     }
 
+    // Talks to the live Sigstore log; skip with: dotnet test -- --filter-not-trait "Network=Live"
     [Fact]
+    [Trait("Network", "Live")]
     public async Task Live_log_finds_the_publisher_of_a_real_file()
     {
         IReadOnlyList<RepoName> repos = await new PublisherFinder(new HttpClient()).FindAsync(RealDigest, TestContext.Current.CancellationToken);
@@ -32,7 +34,9 @@ public class PublisherFinderTests
         Assert.Contains(new RepoName("cli", "cli"), repos);
     }
 
+    // Talks to the live Sigstore log; skip with: dotnet test -- --filter-not-trait "Network=Live"
     [Fact]
+    [Trait("Network", "Live")]
     public async Task Live_log_finds_nobody_for_an_unknown_file()
     {
         IReadOnlyList<RepoName> repos = await new PublisherFinder(new HttpClient()).FindAsync(new string('0', 64), TestContext.Current.CancellationToken);

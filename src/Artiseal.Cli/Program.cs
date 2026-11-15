@@ -10,8 +10,9 @@ if (args.Length < 1 || !File.Exists(args[0]))
     return 2;
 }
 
+Task warm = Trust.WarmAsync(); // the slow download runs while the file is hashed and looked up
 using HttpClient http = new();
-ProofChecker checker = new(new AttestationClient(http, Environment.GetEnvironmentVariable("GITHUB_TOKEN")), new SigstoreVerifier());
+ProofChecker checker = new(new AttestationClient(http, Environment.GetEnvironmentVariable("GITHUB_TOKEN")), Trust.NewVerifier());
 List<RepoName> repos = [];
 
 if (args.Length > 1)

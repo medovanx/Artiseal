@@ -41,7 +41,7 @@ Artiseal answers in one click. It finds who published the file, checks GitHub's 
 
 ## Quick start
 
-1. Build it (see [Building](#building)), or run the app straight from `src/Artiseal.App`.
+1. Download `Artiseal-<version>-win-x64.zip` from the [latest release](https://github.com/medovanx/Artiseal/releases/latest) and unzip it anywhere. It is a single `Artiseal.exe` with nothing to install and no .NET needed.
 2. Open Artiseal and tick **Show "Check with Artiseal" when I right-click a file**.
 3. Right-click any downloaded file and choose **Check with Artiseal**. On Windows 11 it sits under **Show more options**.
 
@@ -92,6 +92,12 @@ The icon is drawn in code by `tools/IconMaker`. To regenerate it:
 ```text
 dotnet run --project tools/IconMaker -- src/Artiseal.App/Assets monogram
 ```
+
+## Releases and versions
+
+Artiseal follows [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH`. Every change is listed in the [changelog](CHANGELOG.md).
+
+Pushing a tag such as `v0.2.0` runs the release workflow, which tests the code, builds the app and the command line tool, publishes them with a `SHA256SUMS.txt`, and adds GitHub build provenance for each download. So you can check an Artiseal download with Artiseal.
 
 ## FAQ
 

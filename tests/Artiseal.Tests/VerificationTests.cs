@@ -88,3 +88,35 @@ public class VerificationTests
         Assert.False(ok);
     }
 }
+
+public class RepoMatchingTests
+{
+    private const string RealDigest = "08c06d10482f12c478018cd259f64acbd5f625712cadf331aad19ba973c879e5";
+
+    private static SigstoreBundle Provenance() => SigstoreBundle.Deserialize(BundleText.Decode(
+        File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "gh_2.104.0_windows_amd64.provenance.sn"))));
+
+    private static ProofChecker Checker() => new(new AttestationClient(new HttpClient()), Trust.NewVerifier());
+
+    [Fact]
+    public async Task Repo_names_ignore_letter_case_like_GitHub_does()
+    {
+        (bool ok, VerificationResult? result) = await Checker().VerifyAsync(
+            Convert.FromHexString(RealDigest), Provenance(), new RepoName("CLI", "Cli"), TestContext.Current.CancellationToken);
+
+        Assert.True(ok, result?.FailureReason);
+    }
+
+    [Theory]
+    [InlineData("cli", "cl.")]
+    [InlineData("cl.", "cli")]
+    [InlineData("cli", "cl")]
+    [InlineData("cli", "cli-extra")]
+    public async Task A_dot_or_a_prefix_never_stands_in_for_the_real_name(string owner, string name)
+    {
+        (bool ok, _) = await Checker().VerifyAsync(
+            Convert.FromHexString(RealDigest), Provenance(), new RepoName(owner, name), TestContext.Current.CancellationToken);
+
+        Assert.False(ok);
+    }
+}
